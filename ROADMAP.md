@@ -27,9 +27,9 @@ Current status and planned features. Checked items are implemented and working.
 ## Phase 3: Functions
 - [x] Declaration: `proc name(args) { ... }`
 - [x] Function calls
-- [ ] `return value`
-- [ ] Recursion
-- [ ] Local variables
+- [x] `return value`
+- [x] Recursion
+- [x] Local variables
 
 ## Phase 4: Strings
 - [ ] Concatenation: `"a" + "b"`
