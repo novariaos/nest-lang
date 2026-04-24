@@ -1,0 +1,15 @@
+proc pyramid(n, max) {
+    if (n <= max) {
+        var i = 0;
+        while (i < n) {
+            print("*");
+            i = i + 1;
+        }
+        print("\n");
+        pyramid(n + 1, max);
+    }
+}
+
+proc main() {
+    pyramid(1, 6);
+}
