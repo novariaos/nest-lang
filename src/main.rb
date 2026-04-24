@@ -1,6 +1,7 @@
 require "colorize"
 require_relative "lexer"
 require_relative "parser"
+require_relative "semantic"
 require_relative "codegen"
 
 path = ARGV[0]
@@ -45,6 +46,11 @@ if ast.nil?
     print "nest: ".bold
     print "error: ".red
     puts "syntax analysis failed"
+    exit(1)
+end
+
+semantic = NestSemanticAnalyzer.new(ast)
+unless semantic.analyze
     exit(1)
 end
 
