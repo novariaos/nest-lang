@@ -44,12 +44,10 @@ Current status and planned features. Checked items are implemented and working.
 - [ ] Length: `len(arr)`
 
 ## Phase 6: File I/O
-- [ ] `open(path, mode)` → file descriptor
-- [ ] `read_line(fd)` → string or `null`
-- [ ] `read_all(fd)` → string
-- [ ] `write(fd, str)` → bytes written
-- [ ] `close(fd)`
-- [ ] `delete(path)`
+- [X] `open(path)` → file descriptor
+- [X] `read(fd)` → string
+- [X] `write(fd, str)` → bytes written
+- [X] `delete(path)`
 - [ ] `readdir(path)` → array of strings
 
 ## Phase 7: Built-in Functions
