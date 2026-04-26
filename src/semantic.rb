@@ -18,7 +18,7 @@ class NestSemanticAnalyzer
       'open'  => { parameters: 1, returns: :int },
       'read'  => { parameters: 1, returns: :string },
       'write' => { parameters: 2, returns: :int },
-      'close' => { parameters: 1, returns: nil },
+      'delete'=> { parameters: 1, returns: nil },
       'len'   => { parameters: 1, returns: :int },
       'str'   => { parameters: 1, returns: :string },
       'int'   => { parameters: 1, returns: :int }

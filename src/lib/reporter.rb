@@ -31,7 +31,7 @@ module Reporter
         emit(:error, message, line, column, length, note, help)
       end
       
-      def warning(message, line:, column:, length: 1, note: nil)
+      def warning(message, line:, column:, length: 1, note: nil, help: nil)
         emit(:warning, message, line, column, length, note)
       end
       

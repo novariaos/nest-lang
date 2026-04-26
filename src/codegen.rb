@@ -277,7 +277,15 @@ class NestCodeGen
       visit_expression(node.arguments[1])  # data (offset)
       @output_lines << "    SYSCALL write"
       @output_lines << "    POP"  # discard bytes written
-      
+    
+    when "delete"
+      if node.arguments.size != 1
+        raise "write expects 1 arguments: fd"
+      end
+      visit_expression(node.arguments[0])
+      @output_lines << "  SYSCALL delete"
+      @output_lines << "  POP"
+
     else
       # Regular function call
       node.arguments.reverse.each do |arg|
