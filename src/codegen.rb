@@ -34,7 +34,8 @@ class NestCodeGen
     @output_lines << ""
     generate_functions
     @output_lines << "end:"
-    @output_lines << "    HLT"
+    @output_lines << "    PUSH 0"
+    @output_lines << "    SYSCALL exit"
 
     File.write(@output_path, @output_lines.join("\n"))
   end
@@ -241,10 +242,49 @@ class NestCodeGen
 
   def visit_function_call(node)
     @output_lines << "    ; call #{node.name}"
-    node.arguments.reverse.each do |arg|
-      visit_expression(arg)
+    
+    case node.name
+    when "open"
+      # open(path) -> fd
+      # SYSCALL open expects path string offset on stack
+      node.arguments.reverse_each do |arg|
+        visit_expression(arg)
+      end
+      @output_lines << "    SYSCALL open"
+      
+    when "read"
+      # read(fd) -> offset (string in heap)
+      # SYSCALL read expects fd on stack
+      node.arguments.reverse_each do |arg|
+        visit_expression(arg)
+      end
+      @output_lines << "    SYSCALL read"
+      
+    when "write"
+      # write(fd, offset) -> bytes written
+      # SYSCALL write expects: offset, fd (in that order? let's check)
+      # Actually from syscall code: offset on top (sp-1), fd at (sp-2)
+      # So we need to push fd first, then offset
+      if node.arguments.size != 2
+        raise "write expects 2 arguments: fd, data"
+      end
+      
+      # Push arguments in reverse order so last argument is on top
+      # write(fd, data) -> we want: fd, data on stack? 
+      # syscall expects: offset (top), fd (below)
+      # So push fd first, then data
+      visit_expression(node.arguments[0])  # fd
+      visit_expression(node.arguments[1])  # data (offset)
+      @output_lines << "    SYSCALL write"
+      @output_lines << "    POP"  # discard bytes written
+      
+    else
+      # Regular function call
+      node.arguments.reverse.each do |arg|
+        visit_expression(arg)
+      end
+      @output_lines << "    CALL #{node.name}"
     end
-    @output_lines << "    CALL #{node.name}"
   end
 
   def visit_while_statement(node)

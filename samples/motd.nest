@@ -1,0 +1,8 @@
+proc main() {
+    var fd = open("/etc/motd");
+    
+    if (fd >= 0) {
+        var content = read(fd);
+        print(content);
+    }
+}

@@ -1,3 +1,5 @@
+# src/semantic.rb
+
 require_relative 'lib/reporter'
 
 class NestSemanticAnalyzer
@@ -9,6 +11,18 @@ class NestSemanticAnalyzer
     @current_function = nil
     @break_depth = 0
     @continue_depth = 0
+    
+    # Built-in functions that don't need to be declared
+    @builtin_functions = {
+      'print' => { parameters: 1, returns: nil },
+      'open'  => { parameters: 1, returns: :int },
+      'read'  => { parameters: 1, returns: :string },
+      'write' => { parameters: 2, returns: :int },
+      'close' => { parameters: 1, returns: nil },
+      'len'   => { parameters: 1, returns: :int },
+      'str'   => { parameters: 1, returns: :string },
+      'int'   => { parameters: 1, returns: :int }
+    }
   end
 
   def analyze
@@ -106,6 +120,19 @@ class NestSemanticAnalyzer
         )
         @errors << "main has parameters"
       end
+    end
+    
+    # Check if function name conflicts with built-in
+    if @builtin_functions[func_name]
+      Reporter.error(
+        "function '#{func_name}' conflicts with built-in function",
+        line: node.line,
+        column: node.column,
+        length: func_name.length,
+        note: "cannot override built-in function",
+        help: "rename your function to something else"
+      )
+      @errors << "conflict with built-in function #{func_name}"
     end
     
     if @functions[func_name]
@@ -233,6 +260,13 @@ class NestSemanticAnalyzer
   end
 
   def analyze_function_call(node)
+    # Check if it's a built-in function first
+    if @builtin_functions[node.name]
+      analyze_builtin_call(node)
+      return
+    end
+    
+    # Not a built-in, check user-defined functions
     unless @functions[node.name]
       Reporter.error(
         "undefined function '#{node.name}'",
@@ -263,6 +297,71 @@ class NestSemanticAnalyzer
     end
     
     node.arguments.each { |arg| analyze_expression(arg) }
+  end
+
+  def analyze_builtin_call(node)
+    func_info = @builtin_functions[node.name]
+    param_count = func_info[:parameters]
+    arg_count = node.arguments.size
+    
+    if node.name == 'print'
+      # Print can take 1 argument (string) or we can support multiple
+      if arg_count != 1
+        Reporter.error(
+          "built-in function 'print' expects 1 argument, got #{arg_count}",
+          line: node.line,
+          column: node.column,
+          length: node.name.length,
+          note: "parameter count mismatch",
+          help: "print expects exactly one argument (string or expression)"
+        )
+        @errors << "argument count mismatch for built-in print"
+      end
+    else
+      if param_count != arg_count
+        Reporter.error(
+          "built-in function '#{node.name}' expects #{param_count} argument#{param_count == 1 ? '' : 's'}, got #{arg_count}",
+          line: node.line,
+          column: node.column,
+          length: node.name.length,
+          note: "parameter count mismatch",
+          help: "#{param_count > arg_count ? "add" : "remove"} #{(param_count - arg_count).abs} argument#{param_count - arg_count == 1 ? '' : 's'}"
+        )
+        @errors << "argument count mismatch for built-in #{node.name}"
+      end
+    end
+    
+    # Analyze each argument
+    node.arguments.each { |arg| analyze_expression(arg) }
+
+    case node.name
+    when 'open'
+      if node.arguments[0] && !string_literal?(node.arguments[0])
+        Reporter.warning(
+          "open() expects a string path",
+          line: node.line,
+          column: node.column,
+          length: node.name.length,
+          note: "argument should be a string literal or variable",
+          help: "pass a string path like '/etc/os_release'"
+        )
+      end
+    when 'write'
+      if node.arguments.size >= 2
+        # First argument is int (file descriptor)
+        # Second argument is string (content)
+        if node.arguments[1] && !string_expression?(node.arguments[1])
+          Reporter.warning(
+            "write() expects a string as second argument",
+            line: node.line,
+            column: node.column,
+            length: node.name.length,
+            note: "second argument should be a string",
+            help: "pass a string or string variable as content"
+          )
+        end
+      end
+    end
   end
 
   def analyze_expression(expr)
@@ -322,5 +421,33 @@ class NestSemanticAnalyzer
     else
       false
     end
+  end
+
+  def string_literal?(expr)
+    case expr
+    when NestParser::StringLiteral
+      true
+    else
+      false
+    end
+  end
+
+  def string_expression?(expr)
+    case expr
+    when NestParser::StringLiteral
+      true
+    when NestParser::Identifier
+      true
+    else
+      false
+    end
+  end
+
+  def builtin_function?(name)
+    @builtin_functions.key?(name)
+  end
+
+  def builtin_function_info(name)
+    @builtin_functions[name]
   end
 end
