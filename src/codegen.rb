@@ -268,7 +268,7 @@ class NestCodeGen
     
     when "delete"
       if node.arguments.size != 1
-        raise "write expects 1 arguments: fd"
+        raise "delete expects 1 arguments: fd"
       end
       visit_expression(node.arguments[0])
       @output_lines << "  SYSCALL delete"
