@@ -18,6 +18,10 @@ proc main() {
         i = i + 1;
     }
 }
+
+/* ^^^^^
+ * Pseudo-code. If you looking for real samples, go to ./samples/
+ */
 ```
 
 ### ✨ Supported Features
