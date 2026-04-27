@@ -10,6 +10,49 @@ proc println(content) {
     print("\n");
 }
 
+proc print_num(n) {
+    var num = n;
+    if (num < 0) {
+        print("-");
+        num = -num;
+    }
+    if (num >= 10) {
+        print_num(num / 10);
+        print_num(num % 10);
+    } else {
+        if (num == 0) {
+            print("0");
+        }
+        if (num == 1){
+            print("1");
+        }
+        if (num == 2){
+             print("2");
+        } 
+        if (num == 3){
+             print("3");
+        }
+        if (num == 4){
+             print("4");
+        }
+        if (num == 5){
+             print("5");
+        }
+        if (num == 6){
+             print("6");
+        }
+        if (num == 7){
+             print("7");
+        }
+        if (num == 8){
+             print("8");
+        }
+        if (num == 9){
+             print("9");
+        }
+    }
+}
+
 /*
 
 // TODO: built-in functions: malloc(); free(); strlen(); read_byte(); write_byte();
