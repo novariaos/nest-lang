@@ -2,7 +2,6 @@ require_relative 'lib/reporter'
 
 class NestLexer
   TOKEN_TYPES = {
-    KEYWORD_PRINT: 'PRINT',
     KEYWORD_VAR: 'VAR',
     KEYWORD_IF: 'IF',
     KEYWORD_ELSE: 'ELSE',
@@ -53,15 +52,20 @@ class NestLexer
     TOKEN_EOF: 'EOF'
   }
   
-  Token = Struct.new(:type, :value, :line, :column) do
+  Token = Struct.new(:type, :value, :line, :column, :file) do
     def to_s
-      "#{type}(#{value.inspect}) at #{line}:#{column}"
+      "#{type}(#{value.inspect}) at #{file}:#{line}:#{column}"
+    end
+    
+    def location
+      SourceLocation.new(file, line, column)
     end
   end
   
-  def initialize(source, filename = "input.nest")
+  def initialize(source, filename = "input.nest", source_map_func = nil)
     @source = source
     @filename = filename
+    @source_map_func = source_map_func
     @position = 0
     @line = 1
     @column = 1
@@ -69,7 +73,12 @@ class NestLexer
     @errors = []
     @warnings = []
     
-    Reporter.configure(source, filename)
+    # Configure reporter
+    if source_map_func
+      Reporter.configure_with_mapper(source, filename, source_map_func)
+    else
+      Reporter.configure(source, filename)
+    end
   end
   
   def tokenize
@@ -83,7 +92,7 @@ class NestLexer
     @warnings.each { |w| puts w }
     
     if @errors.any?
-        return nil
+      return nil
     end
     
     @tokens
@@ -93,84 +102,85 @@ class NestLexer
     skip_whitespace
     
     if eof?
-      return Token.new(:TOKEN_EOF, nil, @line, @column)
+      return Token.new(:TOKEN_EOF, nil, @line, @column, @filename)
     end
     
     start_line = @line
     start_col = @column
+    start_file = get_current_file(start_line)
     
     case current_char
     when '('
       advance
-      return Token.new(:DELIMITER_LPAREN, '(', start_line, start_col)
+      return Token.new(:DELIMITER_LPAREN, '(', start_line, start_col, start_file)
     when ')'
       advance
-      return Token.new(:DELIMITER_RPAREN, ')', start_line, start_col)
+      return Token.new(:DELIMITER_RPAREN, ')', start_line, start_col, start_file)
     when '{'
       advance
-      return Token.new(:DELIMITER_LBRACE, '{', start_line, start_col)
+      return Token.new(:DELIMITER_LBRACE, '{', start_line, start_col, start_file)
     when '}'
       advance
-      return Token.new(:DELIMITER_RBRACE, '}', start_line, start_col)
+      return Token.new(:DELIMITER_RBRACE, '}', start_line, start_col, start_file)
     when '['
       advance
-      return Token.new(:DELIMITER_LBRACKET, '[', start_line, start_col)
+      return Token.new(:DELIMITER_LBRACKET, '[', start_line, start_col, start_file)
     when ']'
       advance
-      return Token.new(:DELIMITER_RBRACKET, ']', start_line, start_col)
+      return Token.new(:DELIMITER_RBRACKET, ']', start_line, start_col, start_file)
     when ';'
       advance
-      return Token.new(:DELIMITER_SEMICOLON, ';', start_line, start_col)
+      return Token.new(:DELIMITER_SEMICOLON, ';', start_line, start_col, start_file)
     when ','
       advance
-      return Token.new(:DELIMITER_COMMA, ',', start_line, start_col)
+      return Token.new(:DELIMITER_COMMA, ',', start_line, start_col, start_file)
     when ':'
       advance
-      return Token.new(:DELIMITER_COLON, ':', start_line, start_col)
+      return Token.new(:DELIMITER_COLON, ':', start_line, start_col, start_file)
     
     when '='
       advance
       if current_char == '='
         advance
-        return Token.new(:OPERATOR_EQ, '==', start_line, start_col)
+        return Token.new(:OPERATOR_EQ, '==', start_line, start_col, start_file)
       end
-      return Token.new(:OPERATOR_ASSIGN, '=', start_line, start_col)
+      return Token.new(:OPERATOR_ASSIGN, '=', start_line, start_col, start_file)
     
     when '!'
       advance
       if current_char == '='
         advance
-        return Token.new(:OPERATOR_NEQ, '!=', start_line, start_col)
+        return Token.new(:OPERATOR_NEQ, '!=', start_line, start_col, start_file)
       end
-      return Token.new(:OPERATOR_NOT, '!', start_line, start_col)
+      return Token.new(:OPERATOR_NOT, '!', start_line, start_col, start_file)
     
     when '<'
       advance
       if current_char == '='
         advance
-        return Token.new(:OPERATOR_LTE, '<=', start_line, start_col)
+        return Token.new(:OPERATOR_LTE, '<=', start_line, start_col, start_file)
       end
-      return Token.new(:OPERATOR_LT, '<', start_line, start_col)
+      return Token.new(:OPERATOR_LT, '<', start_line, start_col, start_file)
     
     when '>'
       advance
       if current_char == '='
         advance
-        return Token.new(:OPERATOR_GTE, '>=', start_line, start_col)
+        return Token.new(:OPERATOR_GTE, '>=', start_line, start_col, start_file)
       end
-      return Token.new(:OPERATOR_GT, '>', start_line, start_col)
+      return Token.new(:OPERATOR_GT, '>', start_line, start_col, start_file)
     
     when '+'
       advance
-      return Token.new(:OPERATOR_PLUS, '+', start_line, start_col)
+      return Token.new(:OPERATOR_PLUS, '+', start_line, start_col, start_file)
     
     when '-'
       advance
-      return Token.new(:OPERATOR_MINUS, '-', start_line, start_col)
+      return Token.new(:OPERATOR_MINUS, '-', start_line, start_col, start_file)
     
     when '*'
       advance
-      return Token.new(:OPERATOR_MULTIPLY, '*', start_line, start_col)
+      return Token.new(:OPERATOR_MULTIPLY, '*', start_line, start_col, start_file)
     
     when '/'
       advance
@@ -181,17 +191,17 @@ class NestLexer
         skip_block_comment
         return next_token
       end
-      return Token.new(:OPERATOR_DIVIDE, '/', start_line, start_col)
+      return Token.new(:OPERATOR_DIVIDE, '/', start_line, start_col, start_file)
     
     when '%'
       advance
-      return Token.new(:OPERATOR_MOD, '%', start_line, start_col)
+      return Token.new(:OPERATOR_MOD, '%', start_line, start_col, start_file)
     
     when '&'
       advance
       if current_char == '&'
         advance
-        return Token.new(:OPERATOR_AND, '&&', start_line, start_col)
+        return Token.new(:OPERATOR_AND, '&&', start_line, start_col, start_file)
       end
       error_at_position(
         "unexpected character `&`",
@@ -204,7 +214,7 @@ class NestLexer
       advance
       if current_char == '|'
         advance
-        return Token.new(:OPERATOR_OR, '||', start_line, start_col)
+        return Token.new(:OPERATOR_OR, '||', start_line, start_col, start_file)
       end
       error_at_position(
         "unexpected character `|`",
@@ -282,44 +292,114 @@ class NestLexer
   end
   
   def skip_block_comment
+    start_line = @line
+    start_col = @column - 1 
+    
     advance
+    
     while !eof?
       if current_char == '*' && peek_char == '/'
+        advance 
         advance
-        advance
-        break
+        return
       end
       advance
     end
+    
+    error_at_position(
+      "unterminated block comment",
+      start_line, start_col, 2,
+      "block comment started here but never closed with '*/'",
+      "add '*/' to close the comment"
+    )
+  end
+  
+  def get_current_file(line)
+    if @source_map_func
+      loc = @source_map_func.call(line, 1)
+      return loc.file if loc
+    end
+    @filename
   end
   
   def error_at_position(message, line, column, length = 1, note = nil, help = nil)
-    error_output = Reporter.error(
-      message,
-      line: line,
-      column: column,
-      length: length,
-      note: note,
-      help: help
-    )
-    @errors << error_output
-    exit(1)
+    if @source_map_func
+      real_loc = @source_map_func.call(line, column)
+      if real_loc
+        Reporter.error(
+          message,
+          line: real_loc.line,
+          column: real_loc.column,
+          length: length,
+          note: note,
+          help: help,
+          file: real_loc.file
+        )
+      else
+        Reporter.error(
+          message,
+          line: line,
+          column: column,
+          length: length,
+          note: note,
+          help: help,
+          file: @filename
+        )
+      end
+    else
+      Reporter.error(
+        message,
+        line: line,
+        column: column,
+        length: length,
+        note: note,
+        help: help,
+        file: @filename
+      )
+    end
+    @errors << message
+    # Don't exit immediately, collect all errors
   end
   
-  def warning_at_position(message, line, column, length = 1, note = nil)
-    warning_output = Reporter.warning(
-      message,
-      line: line,
-      column: column,
-      length: length,
-      note: note
-    )
+  def warning_at_position(message, line, column, length = 1, note = nil, file = nil)
+    if @source_map_func
+      real_loc = @source_map_func.call(line, column)
+      if real_loc
+        warning_output = Reporter.warning(
+          message,
+          line: real_loc.line,
+          column: real_loc.column,
+          length: length,
+          note: note,
+          file: real_loc.file
+        )
+      else
+        warning_output = Reporter.warning(
+          message,
+          line: line,
+          column: column,
+          length: length,
+          note: note,
+          file: file || @filename
+        )
+      end
+    else
+      warning_output = Reporter.warning(
+        message,
+        line: line,
+        column: column,
+        length: length,
+        note: note,
+        file: file || @filename
+      )
+    end
     @warnings << warning_output
   end
   
   def read_string
     start_line = @line
     start_col = @column
+    start_file = get_current_file(start_line)
     advance # skip opening quote
     value = ""
     
@@ -333,7 +413,7 @@ class NestLexer
             "escape sequence not completed",
             "use \\n, \\t, \\\\, or \\\""
           )
-          return Token.new(:LITERAL_STRING, "", start_line, start_col)
+          return Token.new(:LITERAL_STRING, "", start_line, start_col, start_file)
         end
         
         case current_char
@@ -367,16 +447,17 @@ class NestLexer
         "string started here but never closed",
         "add closing `\"` before end of file"
       )
-      return Token.new(:LITERAL_STRING, value, start_line, start_col)
+      return Token.new(:LITERAL_STRING, value, start_line, start_col, start_file)
     end
     
     advance # skip closing quote
-    Token.new(:LITERAL_STRING, value, start_line, start_col)
+    Token.new(:LITERAL_STRING, value, start_line, start_col, start_file)
   end
   
   def read_number
     start_line = @line
     start_col = @column
+    start_file = get_current_file(start_line)
     value = ""
     
     while !eof? && current_char =~ /[0-9]/
@@ -392,12 +473,13 @@ class NestLexer
       )
     end
     
-    Token.new(:LITERAL_INTEGER, value.to_i, start_line, start_col)
+    Token.new(:LITERAL_INTEGER, value.to_i, start_line, start_col, start_file)
   end
   
   def read_identifier_or_keyword
     start_line = @line
     start_col = @column
+    start_file = get_current_file(start_line)
     value = ""
     
     while !eof? && current_char =~ /[a-zA-Z0-9_]/
@@ -405,7 +487,8 @@ class NestLexer
       advance
     end
     
-    if value.match?(/^[A-Z]/) && !["true", "false", "null"].include?(value)
+    # Check for identifiers starting with capital letter (convention warning)
+    if value.match?(/^[A-Z]/) && !["true", "false", "null"].include?(value.downcase)
       warning_at_position(
         "identifier with capital letter",
         start_line, start_col, value.length,
@@ -413,13 +496,14 @@ class NestLexer
       )
     end
 
+    # Check for keywords
     case value
-    when "print", "var", "if", "else", "while", "for",
+    when "var", "if", "else", "while", "for",
          "break", "continue", "proc", "return", "true",
          "false", "null", "len", "str", "int"
-      Token.new(:"KEYWORD_#{value.upcase}", value, start_line, start_col)
+      Token.new(:"KEYWORD_#{value.upcase}", value, start_line, start_col, start_file)
     else
-      Token.new(:IDENTIFIER, value, start_line, start_col)
+      Token.new(:IDENTIFIER, value, start_line, start_col, start_file)
     end
   end
 end

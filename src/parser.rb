@@ -2,7 +2,7 @@ require_relative 'lib/reporter'
 
 class NestParser
   class ParseError < StandardError
-    attr_reader :token, :message, :line, :column
+    attr_reader :token, :message, :line, :column, :file
     
     def initialize(token, message)
       @token = token
@@ -10,10 +10,12 @@ class NestParser
       if token && token.respond_to?(:line) && token.respond_to?(:column)
         @line = token.line
         @column = token.column
+        @file = token.respond_to?(:file) ? token.file : nil
         super(message)
       else
         @line = 1
         @column = 1
+        @file = nil
         super(message)
       end
     end
@@ -21,19 +23,20 @@ class NestParser
   
   # AST Node classes
   class Node
-    attr_reader :line, :column
+    attr_reader :line, :column, :file
     
-    def initialize(line, column)
+    def initialize(line, column, file = nil)
       @line = line
       @column = column
+      @file = file
     end
   end
   
   class Program < Node
     attr_reader :statements
     
-    def initialize(statements, line, column)
-      super(line, column)
+    def initialize(statements, line, column, file = nil)
+      super(line, column, file)
       @statements = statements
     end
   end
@@ -41,8 +44,8 @@ class NestParser
   class BlockStatement < Node
     attr_reader :statements
     
-    def initialize(statements, line, column)
-      super(line, column)
+    def initialize(statements, line, column, file = nil)
+      super(line, column, file)
       @statements = statements
     end
   end
@@ -50,8 +53,8 @@ class NestParser
   class VariableDeclaration < Node
     attr_reader :name, :initializer
     
-    def initialize(name, initializer, line, column)
-      super(line, column)
+    def initialize(name, initializer, line, column, file = nil)
+      super(line, column, file)
       @name = name
       @initializer = initializer
     end
@@ -60,8 +63,8 @@ class NestParser
   class Assignment < Node
     attr_reader :name, :value
     
-    def initialize(name, value, line, column)
-      super(line, column)
+    def initialize(name, value, line, column, file = nil)
+      super(line, column, file)
       @name = name
       @value = value
     end
@@ -70,8 +73,8 @@ class NestParser
   class IfStatement < Node
     attr_reader :condition, :then_branch, :else_branch
     
-    def initialize(condition, then_branch, else_branch, line, column)
-      super(line, column)
+    def initialize(condition, then_branch, else_branch, line, column, file = nil)
+      super(line, column, file)
       @condition = condition
       @then_branch = then_branch
       @else_branch = else_branch
@@ -81,8 +84,8 @@ class NestParser
   class WhileStatement < Node
     attr_reader :condition, :body
     
-    def initialize(condition, body, line, column)
-      super(line, column)
+    def initialize(condition, body, line, column, file = nil)
+      super(line, column, file)
       @condition = condition
       @body = body
     end
@@ -91,8 +94,8 @@ class NestParser
   class ForStatement < Node
     attr_reader :initializer, :condition, :increment, :body
     
-    def initialize(initializer, condition, increment, body, line, column)
-      super(line, column)
+    def initialize(initializer, condition, increment, body, line, column, file = nil)
+      super(line, column, file)
       @initializer = initializer
       @condition = condition
       @increment = increment
@@ -101,22 +104,22 @@ class NestParser
   end
   
   class BreakStatement < Node
-    def initialize(line, column)
-      super(line, column)
+    def initialize(line, column, file = nil)
+      super(line, column, file)
     end
   end
   
   class ContinueStatement < Node
-    def initialize(line, column)
-      super(line, column)
+    def initialize(line, column, file = nil)
+      super(line, column, file)
     end
   end
   
   class ReturnStatement < Node
     attr_reader :value
     
-    def initialize(value, line, column)
-      super(line, column)
+    def initialize(value, line, column, file = nil)
+      super(line, column, file)
       @value = value
     end
   end
@@ -124,8 +127,8 @@ class NestParser
   class FunctionDeclaration < Node
     attr_reader :name, :parameters, :body
     
-    def initialize(name, parameters, body, line, column)
-      super(line, column)
+    def initialize(name, parameters, body, line, column, file = nil)
+      super(line, column, file)
       @name = name
       @parameters = parameters
       @body = body
@@ -135,8 +138,8 @@ class NestParser
   class FunctionCall < Node
     attr_reader :name, :arguments
     
-    def initialize(name, arguments, line, column)
-      super(line, column)
+    def initialize(name, arguments, line, column, file = nil)
+      super(line, column, file)
       @name = name
       @arguments = arguments
     end
@@ -145,8 +148,8 @@ class NestParser
   class BinaryExpression < Node
     attr_reader :left, :operator, :right
     
-    def initialize(left, operator, right, line, column)
-      super(line, column)
+    def initialize(left, operator, right, line, column, file = nil)
+      super(line, column, file)
       @left = left
       @operator = operator
       @right = right
@@ -156,8 +159,8 @@ class NestParser
   class UnaryExpression < Node
     attr_reader :operator, :operand
     
-    def initialize(operator, operand, line, column)
-      super(line, column)
+    def initialize(operator, operand, line, column, file = nil)
+      super(line, column, file)
       @operator = operator
       @operand = operand
     end
@@ -166,8 +169,8 @@ class NestParser
   class IntegerLiteral < Node
     attr_reader :value
     
-    def initialize(value, line, column)
-      super(line, column)
+    def initialize(value, line, column, file = nil)
+      super(line, column, file)
       @value = value
     end
   end
@@ -175,8 +178,8 @@ class NestParser
   class StringLiteral < Node
     attr_reader :value
     
-    def initialize(value, line, column)
-      super(line, column)
+    def initialize(value, line, column, file = nil)
+      super(line, column, file)
       @value = value
     end
   end
@@ -184,23 +187,23 @@ class NestParser
   class BooleanLiteral < Node
     attr_reader :value
     
-    def initialize(value, line, column)
-      super(line, column)
+    def initialize(value, line, column, file = nil)
+      super(line, column, file)
       @value = value
     end
   end
   
   class NullLiteral < Node
-    def initialize(line, column)
-      super(line, column)
+    def initialize(line, column, file = nil)
+      super(line, column, file)
     end
   end
   
   class Identifier < Node
     attr_reader :name
     
-    def initialize(name, line, column)
-      super(line, column)
+    def initialize(name, line, column, file = nil)
+      super(line, column, file)
       @name = name
     end
   end
@@ -208,8 +211,8 @@ class NestParser
   class ArrayLiteral < Node
     attr_reader :elements
     
-    def initialize(elements, line, column)
-      super(line, column)
+    def initialize(elements, line, column, file = nil)
+      super(line, column, file)
       @elements = elements
     end
   end
@@ -217,8 +220,8 @@ class NestParser
   class ArrayAccess < Node
     attr_reader :array, :index
     
-    def initialize(array, index, line, column)
-      super(line, column)
+    def initialize(array, index, line, column, file = nil)
+      super(line, column, file)
       @array = array
       @index = index
     end
@@ -227,8 +230,8 @@ class NestParser
   class LenFunction < Node
     attr_reader :argument
     
-    def initialize(argument, line, column)
-      super(line, column)
+    def initialize(argument, line, column, file = nil)
+      super(line, column, file)
       @argument = argument
     end
   end
@@ -236,8 +239,8 @@ class NestParser
   class StrFunction < Node
     attr_reader :argument
     
-    def initialize(argument, line, column)
-      super(line, column)
+    def initialize(argument, line, column, file = nil)
+      super(line, column, file)
       @argument = argument
     end
   end
@@ -245,18 +248,9 @@ class NestParser
   class IntFunction < Node
     attr_reader :argument
     
-    def initialize(argument, line, column)
-      super(line, column)
+    def initialize(argument, line, column, file = nil)
+      super(line, column, file)
       @argument = argument
-    end
-  end
-  
-  class PrintStatement < Node
-    attr_reader :value
-    
-    def initialize(value, line, column)
-      super(line, column)
-      @value = value
     end
   end
   
@@ -281,7 +275,13 @@ class NestParser
       return nil
     end
     
-    Program.new(statements, 1, 1)
+    # Get file from first statement or use filename
+    file = @filename
+    if statements.any? && statements.first.respond_to?(:file)
+      file = statements.first.file
+    end
+    
+    Program.new(statements, 1, 1, file)
   rescue ParseError => e
     nil
   end
@@ -303,6 +303,11 @@ class NestParser
   
   def eof?
     @position >= @tokens.length || (current_token && current_token.type == :TOKEN_EOF)
+  end
+  
+  def current_file
+    token = current_token
+    token.respond_to?(:file) ? token.file : @filename
   end
   
   def expect(type, value = nil)
@@ -412,9 +417,7 @@ class NestParser
   end
   
   def parse_statement
-    if match?(:KEYWORD_PRINT)
-      parse_print_statement
-    elsif match?(:KEYWORD_VAR)
+    if match?(:KEYWORD_VAR)
       parse_variable_declaration
     elsif match?(:KEYWORD_IF)
       parse_if_statement
@@ -463,16 +466,6 @@ class NestParser
     end
   end
   
-  def parse_print_statement
-    token = expect(:KEYWORD_PRINT)
-    expect(:DELIMITER_LPAREN, '(')
-    value = parse_expression
-    expect(:DELIMITER_RPAREN, ')')
-    expect(:DELIMITER_SEMICOLON, ';')
-    
-    PrintStatement.new(value, token.line, token.column)
-  end
-  
   def parse_variable_declaration
     var_token = expect(:KEYWORD_VAR)
     name_token = expect(:IDENTIFIER)
@@ -484,7 +477,8 @@ class NestParser
       name_token.value,
       initializer,
       var_token.line,
-      var_token.column
+      var_token.column,
+      var_token.file
     )
   end
   
@@ -501,7 +495,7 @@ class NestParser
       else_branch = parse_block
     end
     
-    IfStatement.new(condition, then_branch, else_branch, if_token.line, if_token.column)
+    IfStatement.new(condition, then_branch, else_branch, if_token.line, if_token.column, if_token.file)
   end
   
   def parse_while_statement
@@ -511,7 +505,7 @@ class NestParser
     expect(:DELIMITER_RPAREN, ')')
     body = parse_block
     
-    WhileStatement.new(condition, body, while_token.line, while_token.column)
+    WhileStatement.new(condition, body, while_token.line, while_token.column, while_token.file)
   end
   
   def parse_for_statement
@@ -525,7 +519,7 @@ class NestParser
       name = expect(:IDENTIFIER)
       expect(:OPERATOR_ASSIGN, '=')
       value = parse_expression
-      initializer = Assignment.new(name.value, value, name.line, name.column)
+      initializer = Assignment.new(name.value, value, name.line, name.column, name.file)
       expect(:DELIMITER_SEMICOLON, ';')
     else
       expect(:DELIMITER_SEMICOLON, ';')
@@ -545,19 +539,19 @@ class NestParser
     
     body = parse_block
     
-    ForStatement.new(initializer, condition, increment, body, for_token.line, for_token.column)
+    ForStatement.new(initializer, condition, increment, body, for_token.line, for_token.column, for_token.file)
   end
   
   def parse_break_statement
     token = expect(:KEYWORD_BREAK)
     expect(:DELIMITER_SEMICOLON, ';')
-    BreakStatement.new(token.line, token.column)
+    BreakStatement.new(token.line, token.column, token.file)
   end
   
   def parse_continue_statement
     token = expect(:KEYWORD_CONTINUE)
     expect(:DELIMITER_SEMICOLON, ';')
-    ContinueStatement.new(token.line, token.column)
+    ContinueStatement.new(token.line, token.column, token.file)
   end
   
   def parse_return_statement
@@ -567,7 +561,7 @@ class NestParser
       value = parse_expression
     end
     expect(:DELIMITER_SEMICOLON, ';')
-    ReturnStatement.new(value, token.line, token.column)
+    ReturnStatement.new(value, token.line, token.column, token.file)
   end
   
   def parse_function_declaration
@@ -588,7 +582,14 @@ class NestParser
     expect(:DELIMITER_RPAREN, ')')
     body = parse_block
     
-    FunctionDeclaration.new(name_token.value, parameters, body, proc_token.line, proc_token.column)
+    FunctionDeclaration.new(
+      name_token.value, 
+      parameters, 
+      body, 
+      proc_token.line, 
+      proc_token.column, 
+      proc_token.file
+    )
   end
   
   def parse_identifier_statement
@@ -607,11 +608,11 @@ class NestParser
     value = parse_expression
     expect(:DELIMITER_SEMICOLON, ';')
     
-    Assignment.new(name_token.value, value, name_token.line, name_token.column)
+    Assignment.new(name_token.value, value, name_token.line, name_token.column, name_token.file)
   end
   
   def parse_block
-    expect(:DELIMITER_LBRACE, '{')
+    brace_token = expect(:DELIMITER_LBRACE, '{')
     
     statements = []
     until match?(:DELIMITER_RBRACE) || eof?
@@ -620,9 +621,11 @@ class NestParser
     end
     
     expect(:DELIMITER_RBRACE, '}')
-    line = statements.first&.line || 1
-    column = statements.first&.column || 1
-    BlockStatement.new(statements, line, column)
+    line = statements.first&.line || brace_token.line
+    column = statements.first&.column || brace_token.column
+    file = statements.first&.file || brace_token.file
+    
+    BlockStatement.new(statements, line, column, file)
   end
   
   def parse_expression(precedence = 0)
@@ -642,7 +645,7 @@ class NestParser
       
       advance
       right = parse_binary_expression(precedence + 1)
-      left = BinaryExpression.new(left, token.value, right, token.line, token.column)
+      left = BinaryExpression.new(left, token.value, right, token.line, token.column, token.file)
     end
     
     left
@@ -672,7 +675,7 @@ class NestParser
       token = current_token
       advance
       operand = parse_unary_expression
-      UnaryExpression.new(token.value, operand, token.line, token.column)
+      UnaryExpression.new(token.value, operand, token.line, token.column, token.file)
     else
       parse_primary_expression
     end
@@ -696,23 +699,23 @@ class NestParser
     case token.type
     when :LITERAL_INTEGER
       advance
-      IntegerLiteral.new(token.value, token.line, token.column)
+      IntegerLiteral.new(token.value, token.line, token.column, token.file)
     
     when :LITERAL_STRING
       advance
-      StringLiteral.new(token.value, token.line, token.column)
+      StringLiteral.new(token.value, token.line, token.column, token.file)
     
     when :KEYWORD_TRUE
       advance
-      BooleanLiteral.new(true, token.line, token.column)
+      BooleanLiteral.new(true, token.line, token.column, token.file)
     
     when :KEYWORD_FALSE
       advance
-      BooleanLiteral.new(false, token.line, token.column)
+      BooleanLiteral.new(false, token.line, token.column, token.file)
     
     when :KEYWORD_NULL
       advance
-      NullLiteral.new(token.line, token.column)
+      NullLiteral.new(token.line, token.column, token.file)
     
     when :DELIMITER_LPAREN
       advance
@@ -762,7 +765,7 @@ class NestParser
     end
     
     expect(:DELIMITER_RBRACKET, ']')
-    ArrayLiteral.new(elements, start_token.line, start_token.column)
+    ArrayLiteral.new(elements, start_token.line, start_token.column, start_token.file)
   end
   
   def parse_identifier_or_call
@@ -773,7 +776,7 @@ class NestParser
     elsif match?(:DELIMITER_LBRACKET)
       parse_array_access(name_token)
     else
-      Identifier.new(name_token.value, name_token.line, name_token.column)
+      Identifier.new(name_token.value, name_token.line, name_token.column, name_token.file)
     end
   end
   
@@ -790,7 +793,7 @@ class NestParser
     end
     
     expect(:DELIMITER_RPAREN, ')')
-    FunctionCall.new(name_token.value, arguments, name_token.line, name_token.column)
+    FunctionCall.new(name_token.value, arguments, name_token.line, name_token.column, name_token.file)
   end
   
   def parse_array_access(name_token)
@@ -799,10 +802,11 @@ class NestParser
     expect(:DELIMITER_RBRACKET, ']')
     
     ArrayAccess.new(
-      Identifier.new(name_token.value, name_token.line, name_token.column),
+      Identifier.new(name_token.value, name_token.line, name_token.column, name_token.file),
       index,
       name_token.line,
-      name_token.column
+      name_token.column,
+      name_token.file
     )
   end
   
@@ -812,7 +816,7 @@ class NestParser
     argument = parse_expression
     expect(:DELIMITER_RPAREN, ')')
     
-    LenFunction.new(argument, token.line, token.column)
+    LenFunction.new(argument, token.line, token.column, token.file)
   end
   
   def parse_str_function
@@ -821,7 +825,7 @@ class NestParser
     argument = parse_expression
     expect(:DELIMITER_RPAREN, ')')
     
-    StrFunction.new(argument, token.line, token.column)
+    StrFunction.new(argument, token.line, token.column, token.file)
   end
   
   def parse_int_function
@@ -830,7 +834,7 @@ class NestParser
     argument = parse_expression
     expect(:DELIMITER_RPAREN, ')')
     
-    IntFunction.new(argument, token.line, token.column)
+    IntFunction.new(argument, token.line, token.column, token.file)
   end
 end
 
@@ -841,6 +845,11 @@ class ASTPrinter
   
   def print(node, level = 0)
     indent = " " * (level * @indent)
+    
+    # Показываем файл для корневых узлов
+    if level == 0 && node.respond_to?(:file) && node.file
+      puts "#{indent}# File: #{node.file}"
+    end
     
     case node
     when NestParser::Program
@@ -906,10 +915,6 @@ class ASTPrinter
       puts "#{indent}Call: #{node.name}"
       puts "#{indent}  Arguments:"
       node.arguments.each { |arg| print(arg, level + 2) }
-    
-    when NestParser::PrintStatement
-      puts "#{indent}Print:"
-      print(node.value, level + 1)
     
     when NestParser::BinaryExpression
       puts "#{indent}Binary: #{node.operator}"

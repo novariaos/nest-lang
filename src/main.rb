@@ -3,6 +3,7 @@ require_relative "lexer"
 require_relative "parser"
 require_relative "semantic"
 require_relative "codegen"
+require_relative "preprocessor"
 
 path = ARGV[0]
 out = ARGV[1]
@@ -27,8 +28,19 @@ if ARGV[1] == nil
     out = "out"
 end
 
+# Run preprocessor
+preprocessor = NestPreprocessor.new
+begin
+    processed_source, source_map_func = preprocessor.preprocess(source, path)
+rescue PreprocessorError => e
+    print "nest: ".bold
+    print "error: ".red
+    puts " #{e.message}"
+    exit(1)
+end
 
-lexer = NestLexer.new(source, path)
+# Lex with source mapping
+lexer = NestLexer.new(processed_source, path, source_map_func)
 tokens = lexer.tokenize
 
 if tokens.nil?
@@ -52,10 +64,6 @@ end
 semantic = NestSemanticAnalyzer.new(ast)
 unless semantic.analyze
     exit(1)
-end
-
-if @errors != nil
-    puts "\n#{Reporter::COLORS[:bold]}#{Reporter::COLORS[:red]}aborting due to #{@errors.size} previous error#{@errors.size == 1 ? '' : 's'}#{Reporter::COLORS[:reset]}\n"
 end
 
 codegen = NestCodeGen.new(ast, "#{out}.asm")

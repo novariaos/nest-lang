@@ -6,38 +6,51 @@ class NestSemanticAnalyzer
   def initialize(ast)
     @ast = ast
     @has_main = false
+    @main_location = nil
     @functions = {}
     @errors = []
     @current_function = nil
     @break_depth = 0
     @continue_depth = 0
+    @processed_nodes = 0
     
     # Built-in functions that don't need to be declared
     @builtin_functions = {
-      'print' => { parameters: 1, returns: nil },
       'open'  => { parameters: 1, returns: :int },
       'read'  => { parameters: 1, returns: :string },
       'write' => { parameters: 2, returns: :int },
       'delete'=> { parameters: 1, returns: nil },
       'len'   => { parameters: 1, returns: :int },
       'str'   => { parameters: 1, returns: :string },
-      'int'   => { parameters: 1, returns: :int }
+      'int'   => { parameters: 1, returns: :int },
+      'exit'  => { parameters: 1, returns: nil }
     }
   end
 
   def analyze
     return nil if @ast.nil?
     
+    puts "[DEBUG] Analyzing AST..." if ENV['NEST_DEBUG']
     analyze_program(@ast)
     
+    puts "[DEBUG] Found main? #{@has_main}" if ENV['NEST_DEBUG']
+    puts "[DEBUG] Functions found: #{@functions.keys}" if ENV['NEST_DEBUG']
+    
     unless @has_main
+      error_msg = "missing required function 'main'"
+      help_msg = "add 'proc main() { ... }' at the top level"
+      
+      if @functions.any?
+        help_msg = "found functions: #{@functions.keys.join(', ')}. Did you forget to declare 'main'?"
+      end
+      
       Reporter.error(
-        "missing required function 'main'",
+        error_msg,
         line: 1,
         column: 1,
         length: 1,
         note: "program entry point not found",
-        help: "add 'proc main() { ... }' at the top level"
+        help: help_msg
       )
       @errors << "missing main function"
     end
@@ -56,12 +69,16 @@ class NestSemanticAnalyzer
     case node
     when NestParser::Program
       node.statements.each { |stmt| analyze_statement(stmt) }
+    when Array
+      node.each { |stmt| analyze_statement(stmt) }
     else
-      analyze_statement(node)
+      analyze_statement(node) if node.respond_to?(:is_a?)
     end
   end
 
   def analyze_statement(stmt)
+    return unless stmt
+    
     case stmt
     when NestParser::FunctionDeclaration
       analyze_function_declaration(stmt)
@@ -83,37 +100,29 @@ class NestSemanticAnalyzer
       analyze_continue_statement(stmt)
     when NestParser::ReturnStatement
       analyze_return_statement(stmt)
-    when NestParser::PrintStatement
-      analyze_expression(stmt.value)
     when NestParser::FunctionCall
       analyze_function_call(stmt)
-    when NestParser::Expression
+    when NestParser::Expression, NestParser::BinaryExpression, NestParser::UnaryExpression
       analyze_expression(stmt)
+    else
+      # ignore
     end
   end
 
   def analyze_function_declaration(node)
     func_name = node.name
     
+    puts "[DEBUG] Found function: #{func_name}" if ENV['NEST_DEBUG']
+    
     if func_name == "main"
       @has_main = true
+      @main_location = { line: node.line, column: node.column, file: node.file }
       
       if node.parameters.size > 0
-        column = node.column
-        line = node.line
-        source_line = Reporter.source_lines[line - 1] if Reporter.source_lines
-        
-        if source_line
-          main_pos = source_line.index('main')
-          if main_pos
-            column = main_pos + 7
-          end
-        end
-        
         Reporter.error(
           "function 'main' should not have parameters",
-          line: line,
-          column: column,
+          line: node.line,
+          column: node.column,
           length: 4,
           note: "main must have zero parameters",
           help: "remove parameters from main function"
@@ -136,12 +145,13 @@ class NestSemanticAnalyzer
     end
     
     if @functions[func_name]
+      existing = @functions[func_name][:node]
       Reporter.error(
         "function '#{func_name}' already declared",
         line: node.line,
         column: node.column,
         length: func_name.length,
-        note: "previous declaration here",
+        note: "previous declaration at #{existing.file}:#{existing.line}",
         help: "rename one of the functions or remove duplication"
       )
       @errors << "duplicate function #{func_name}"
@@ -151,33 +161,34 @@ class NestSemanticAnalyzer
     
     old_function = @current_function
     @current_function = func_name
-    analyze_block(node.body)
+    analyze_block(node.body) if node.body
     @current_function = old_function
   end
 
   def analyze_variable_declaration(node)
-    analyze_expression(node.initializer)
+    analyze_expression(node.initializer) if node.initializer
   end
 
   def analyze_assignment(node)
-    analyze_expression(node.value)
+    analyze_expression(node.value) if node.value
   end
 
   def analyze_block(node)
+    return unless node && node.statements
     node.statements.each { |stmt| analyze_statement(stmt) }
   end
 
   def analyze_if_statement(node)
-    analyze_expression(node.condition)
-    analyze_block(node.then_branch)
+    analyze_expression(node.condition) if node.condition
+    analyze_block(node.then_branch) if node.then_branch
     analyze_block(node.else_branch) if node.else_branch
   end
 
   def analyze_while_statement(node)
-    analyze_expression(node.condition)
+    analyze_expression(node.condition) if node.condition
     @break_depth += 1
     @continue_depth += 1
-    analyze_block(node.body)
+    analyze_block(node.body) if node.body
     @break_depth -= 1
     @continue_depth -= 1
   end
@@ -197,7 +208,7 @@ class NestSemanticAnalyzer
     
     @break_depth += 1
     @continue_depth += 1
-    analyze_block(node.body)
+    analyze_block(node.body) if node.body
     @break_depth -= 1
     @continue_depth -= 1
   end
@@ -268,15 +279,16 @@ class NestSemanticAnalyzer
     
     # Not a built-in, check user-defined functions
     unless @functions[node.name]
-      Reporter.error(
-        "undefined function '#{node.name}'",
+      # Don't error if it's a forward declaration (will be checked later)
+      # But we can warn
+      Reporter.warning(
+        "function '#{node.name}' might be undefined",
         line: node.line,
         column: node.column,
         length: node.name.length,
         note: "function not declared before use",
-        help: "declare '#{node.name}' before calling it"
+        help: "ensure '#{node.name}' is declared somewhere"
       )
-      @errors << "undefined function #{node.name}"
       return
     end
     
@@ -305,7 +317,6 @@ class NestSemanticAnalyzer
     arg_count = node.arguments.size
     
     if node.name == 'print'
-      # Print can take 1 argument (string) or we can support multiple
       if arg_count != 1
         Reporter.error(
           "built-in function 'print' expects 1 argument, got #{arg_count}",
@@ -316,6 +327,18 @@ class NestSemanticAnalyzer
           help: "print expects exactly one argument (string or expression)"
         )
         @errors << "argument count mismatch for built-in print"
+      end
+    elsif node.name == 'exit'
+      if arg_count != 1
+        Reporter.error(
+          "built-in function 'exit' expects 1 argument, got #{arg_count}",
+          line: node.line,
+          column: node.column,
+          length: node.name.length,
+          note: "parameter count mismatch",
+          help: "exit expects exit code (integer)"
+        )
+        @errors << "argument count mismatch for built-in exit"
       end
     else
       if param_count != arg_count
@@ -333,38 +356,11 @@ class NestSemanticAnalyzer
     
     # Analyze each argument
     node.arguments.each { |arg| analyze_expression(arg) }
-
-    case node.name
-    when 'open'
-      if node.arguments[0] && !string_literal?(node.arguments[0])
-        Reporter.warning(
-          "open() expects a string path",
-          line: node.line,
-          column: node.column,
-          length: node.name.length,
-          note: "argument should be a string literal or variable",
-          help: "pass a string path like '/etc/os_release'"
-        )
-      end
-    when 'write'
-      if node.arguments.size >= 2
-        # First argument is int (file descriptor)
-        # Second argument is string (content)
-        if node.arguments[1] && !string_expression?(node.arguments[1])
-          Reporter.warning(
-            "write() expects a string as second argument",
-            line: node.line,
-            column: node.column,
-            length: node.name.length,
-            note: "second argument should be a string",
-            help: "pass a string or string variable as content"
-          )
-        end
-      end
-    end
   end
 
   def analyze_expression(expr)
+    return unless expr
+    
     case expr
     when NestParser::BinaryExpression
       analyze_binary_expression(expr)
@@ -377,19 +373,20 @@ class NestSemanticAnalyzer
     when NestParser::LenFunction
       analyze_len_function(expr)
     when NestParser::StrFunction
-      analyze_expression(expr.argument)
+      analyze_expression(expr.argument) if expr.argument
     when NestParser::IntFunction
-      analyze_expression(expr.argument)
+      analyze_expression(expr.argument) if expr.argument
     else
+      # Literals and identifiers don't need analysis
       expr
     end
   end
 
   def analyze_binary_expression(node)
-    analyze_expression(node.left)
-    analyze_expression(node.right)
+    analyze_expression(node.left) if node.left
+    analyze_expression(node.right) if node.right
     
-    if node.operator == '/' && is_zero_division_risk?(node.right)
+    if node.operator == '/' && node.right && is_zero_division_risk?(node.right)
       Reporter.warning(
         "potential division by zero",
         line: node.line,
@@ -402,16 +399,16 @@ class NestSemanticAnalyzer
   end
 
   def analyze_unary_expression(node)
-    analyze_expression(node.operand)
+    analyze_expression(node.operand) if node.operand
   end
 
   def analyze_array_access(node)
-    analyze_expression(node.array)
-    analyze_expression(node.index)
+    analyze_expression(node.array) if node.array
+    analyze_expression(node.index) if node.index
   end
 
   def analyze_len_function(node)
-    analyze_expression(node.argument)
+    analyze_expression(node.argument) if node.argument
   end
 
   def is_zero_division_risk?(expr)

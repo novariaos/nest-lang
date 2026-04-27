@@ -157,8 +157,6 @@ class NestCodeGen
 
   def visit_statement(stmt)
     case stmt
-    when NestParser::PrintStatement
-      visit_print_statement(stmt)
     when NestParser::VariableDeclaration
       visit_variable_declaration(stmt)
     when NestParser::Assignment
@@ -215,16 +213,6 @@ class NestCodeGen
     else
       raise "Undefined variable: #{node.name}"
     end
-    @output_lines << ""
-  end
-
-  def visit_print_statement(node)
-    @output_lines << "    ; print"
-    visit_expression(node.value)
-    @output_lines << "    PUSH 1"
-    @output_lines << "    SWAP"
-    @output_lines << "    SYSCALL write"
-    @output_lines << "    POP"
     @output_lines << ""
   end
 

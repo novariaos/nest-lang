@@ -1,0 +1,31 @@
+//! prelude.nest
+//!    this file is automatically loaded into your program.
+
+proc print(content) {
+    write(1, content);
+}
+
+proc println(content) {
+    print(content);
+    print("\n");
+}
+
+/*
+
+// TODO: built-in functions: malloc(); free(); strlen(); read_byte(); write_byte();
+proc concat(src1: string, src2: string): string {
+    var len1 = strlen(src1);
+    var len2 = strlen(src2);
+    var total = len1 + len2;
+
+    var result = malloc(total);
+
+    memcpy(result, src1, len1);
+    memcpy(result + len1, src2, len2);
+    
+    write_byte(result + total - 1, 0);
+    
+    return result;
+}
+
+*/
