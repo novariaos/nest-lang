@@ -1,8 +1,12 @@
 proc main() {
+    var buf = sbrk(1024);
+
     var fd = open("/etc/motd");
     
     if (fd >= 0) {
-        var content = read(fd);
-        print(content);
+        var read_bytes = read(fd, buf);
+        print(buf);
     }
+    
+    sbrk(-1024);
 }

@@ -12,7 +12,7 @@ syn keyword nestStatement    break continue
 syn keyword nestBoolean      true false
 syn keyword nestNull         null
 
-syn keyword nestBuiltin      print println print_num open read write delete
+syn keyword nestBuiltin      print println printn
 syn keyword nestKeyword      len str int
 
 " Операторы - специальные выделения

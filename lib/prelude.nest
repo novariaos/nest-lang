@@ -10,15 +10,15 @@ proc println(content) {
     print("\n");
 }
 
-proc print_num(n) {
+proc printn(n) {
     var num = n;
     if (num < 0) {
         print("-");
         num = -num;
     }
     if (num >= 10) {
-        print_num(num / 10);
-        print_num(num % 10);
+        printn(num / 10);
+        printn(num % 10);
     } else {
         if (num == 0) {
             print("0");

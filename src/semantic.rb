@@ -17,13 +17,13 @@ class NestSemanticAnalyzer
     # Built-in functions that don't need to be declared
     @builtin_functions = {
       'open'  => { parameters: 1, returns: :int },
-      'read'  => { parameters: 1, returns: :string },
+      'read'  => { parameters: 2, returns: :string },
       'write' => { parameters: 2, returns: :int },
       'delete'=> { parameters: 1, returns: nil },
       'len'   => { parameters: 1, returns: :int },
       'str'   => { parameters: 1, returns: :string },
       'int'   => { parameters: 1, returns: :int },
-      'exit'  => { parameters: 1, returns: nil }
+      'sbrk' => { parameters: 1, returns: :int},
     }
   end
 
