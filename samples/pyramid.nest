@@ -1,4 +1,4 @@
-proc pyramid(n, max) {
+proc pyramid(int: n, int: max) {
     if (n <= max) {
         var i = 0;
         while (i < n) {

@@ -62,7 +62,7 @@ class NestCodeGen
       node.statements.each { |stmt| collect_strings_and_globals(stmt) }
     when NestParser::VariableDeclaration
       if @current_function.nil?
-        type = infer_type(node.initializer)
+        type = infer_type(node)
         offset = @global_offset + @next_global * 4
         @globals[node.name] = { offset: offset, type: type, initialized: !!node.initializer }
         @next_global += 1
@@ -106,13 +106,54 @@ class NestCodeGen
   end
 
   def infer_type(expr)
+    return :int unless expr
+
     case expr
+    when NestParser::VariableDeclaration
+      expr.respond_to?(:inferred_type) && expr.inferred_type ? expr.inferred_type : infer_type(expr.initializer)
     when NestParser::StringLiteral then :string
-    when NestParser::IntegerLiteral then :i32
+    when NestParser::IntegerLiteral then :int
     when NestParser::BooleanLiteral then :bool
-    when nil then :i32
-    else :i32
+    when NestParser::Identifier
+      var = resolve_variable_in_codegen(expr.name)
+      var ? var[:type] : :int
+    when NestParser::BinaryExpression
+      infer_binary_type(expr)
+    when NestParser::UnaryExpression
+      expr.operator == '-' ? :int : :bool
+    when NestParser::FunctionCall
+      infer_call_type(expr)
+    when NestParser::LenFunction then :int
+    when NestParser::StrFunction then :string
+    when NestParser::IntFunction then :int
+    when nil then :int
+    else :int
     end
+  end
+
+  def resolve_variable_in_codegen(name)
+    return @locals[name] if @locals[name]
+    return @globals[name] if @globals[name]
+    nil
+  end
+
+  def infer_binary_type(node)
+    left_type = infer_type(node.left)
+    right_type = infer_type(node.right)
+
+    return :string if node.operator == '+' && (left_type == :string || right_type == :string)
+    return :bool if %w[< > <= >= == !=].include?(node.operator)
+    return :bool if %w[&& ||].include?(node.operator)
+    :int
+  end
+
+  def infer_call_type(node)
+    builtins = {
+      'open' => :int, 'read' => :int, 'write' => :int,
+      'delete' => :void, 'sbrk' => :int, 'print' => :void,
+      'println' => :void, 'len' => :int, 'str' => :string, 'int' => :int,
+    }
+    builtins[node.name] || :int
   end
 
   def initialize_globals_and_strings
@@ -227,9 +268,10 @@ class NestCodeGen
     @next_local = 0
     params_count = node.parameters.size
 
+    params_str = node.parameters.map { |p| "#{p.type}: #{p.name}" }.join(', ')
     @output_lines << ""
     @output_lines << "#{node.name}:"
-    @output_lines << "    ; function #{node.name}(#{node.parameters.join(', ')})"
+    @output_lines << "    ; function #{node.name}(#{params_str})"
 
     local_count = count_function_locals(node.body)
     total_locals = params_count + local_count
@@ -238,7 +280,7 @@ class NestCodeGen
     @output_lines << "    ENTER #{total_locals}"
 
     node.parameters.each_with_index do |param, idx|
-      @locals[param] = { offset: idx, type: :i32, is_param: true }
+      @locals[param.name] = { offset: idx, type: resolve_type(param.type), is_param: true }
     end
 
     visit_block_statement(node.body)
@@ -249,6 +291,15 @@ class NestCodeGen
     end
 
     @current_function = nil
+  end
+
+  def resolve_type(type_str)
+    case type_str
+    when 'int' then :int
+    when 'string' then :string
+    when 'bool' then :bool
+    else :int
+    end
   end
 
   def visit_statement(stmt)
@@ -280,7 +331,8 @@ class NestCodeGen
     if @current_function
       params_count = @function_locals[@current_function][:params]
       offset = params_count + @next_local
-      @locals[node.name] = { offset: offset, type: infer_type(node.initializer), is_param: false }
+      type = node.respond_to?(:inferred_type) && node.inferred_type ? node.inferred_type : infer_type(node.initializer)
+      @locals[node.name] = { offset: offset, type: type, is_param: false }
       @next_local += 1
 
       @output_lines << "    ; local var #{node.name}"
@@ -559,9 +611,4 @@ class NestCodeGen
       raise "Unknown unary operator: #{node.operator}"
     end
   end
-end
-
-# Add heap_offset attribute to StringLiteral nodes
-class NestParser::StringLiteral
-  attr_accessor :heap_offset
 end

@@ -17,6 +17,8 @@ class NestLexer
     KEYWORD_LEN: 'LEN',
     KEYWORD_STR: 'STR',
     KEYWORD_INT: 'INT',
+    KEYWORD_STRING: 'STRING_TYPE',
+    KEYWORD_BOOL: 'BOOL_TYPE',
     
     OPERATOR_ASSIGN: '=',
     OPERATOR_PLUS: '+',
@@ -500,7 +502,7 @@ class NestLexer
     case value
     when "var", "if", "else", "while", "for",
          "break", "continue", "proc", "return", "true",
-         "false", "null", "len", "str", "int"
+         "false", "null", "len", "str", "int", "string", "bool"
       Token.new(:"KEYWORD_#{value.upcase}", value, start_line, start_col, start_file)
     else
       Token.new(:IDENTIFIER, value, start_line, start_col, start_file)

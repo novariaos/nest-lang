@@ -1,16 +1,16 @@
 //! prelude.nest
 //!    this file is automatically loaded into your program.
 
-proc print(content) {
+proc print(string: content) {
     write(1, content);
 }
 
-proc println(content) {
+proc println(string: content) {
     print(content);
     print("\n");
 }
 
-proc printn(n) {
+proc printn(int: n) {
     var num = n;
     if (num < 0) {
         print("-");
@@ -56,7 +56,7 @@ proc printn(n) {
 /*
 
 // TODO: built-in functions: malloc(); free(); strlen(); read_byte(); write_byte();
-proc concat(src1: string, src2: string): string {
+proc concat(string: src1, string: src2) {
     var len1 = strlen(src1);
     var len2 = strlen(src2);
     var total = len1 + len2;

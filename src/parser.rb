@@ -124,6 +124,16 @@ class NestParser
     end
   end
   
+  class Parameter < Node
+    attr_reader :name, :type
+    
+    def initialize(name, type, line, column, file = nil)
+      super(line, column, file)
+      @name = name
+      @type = type
+    end
+  end
+
   class FunctionDeclaration < Node
     attr_reader :name, :parameters, :body
     
@@ -572,8 +582,10 @@ class NestParser
     parameters = []
     unless match?(:DELIMITER_RPAREN)
       loop do
-        param = expect(:IDENTIFIER)
-        parameters << param.value
+        type_token = expect_type_keyword
+        expect(:DELIMITER_COLON, ':')
+        name_tok = expect(:IDENTIFIER)
+        parameters << Parameter.new(name_tok.value, type_token.value, type_token.line, type_token.column, type_token.file)
         break unless match?(:DELIMITER_COMMA)
         advance
       end
@@ -590,6 +602,38 @@ class NestParser
       proc_token.column, 
       proc_token.file
     )
+  end
+
+  def expect_type_keyword
+    token = current_token
+    if eof? || token.nil?
+      @has_errors = true
+      Reporter.error(
+        "expected type keyword",
+        line: 1,
+        column: 1,
+        length: 1,
+        note: "expected 'int', 'string', or 'bool'",
+        help: "specify the parameter type: 'int: name'"
+      )
+      raise ParseError.new(token, "expected type keyword")
+    end
+
+    unless %i[KEYWORD_INT KEYWORD_STRING KEYWORD_BOOL].include?(token.type)
+      @has_errors = true
+      Reporter.error(
+        "expected type keyword",
+        line: token.line,
+        column: token.column,
+        length: token.value.to_s.length,
+        note: "found #{token.value.inspect}",
+        help: "use 'int', 'string', or 'bool' as parameter type"
+      )
+      raise ParseError.new(token, "expected type keyword")
+    end
+
+    advance
+    token
   end
   
   def parse_identifier_statement
@@ -908,7 +952,8 @@ class ASTPrinter
       print(node.value, level + 1) if node.value
     
     when NestParser::FunctionDeclaration
-      puts "#{indent}Function: #{node.name}(#{node.parameters.join(', ')})"
+      params_str = node.parameters.map { |p| "#{p.type}: #{p.name}" }.join(', ')
+      puts "#{indent}Function: #{node.name}(#{params_str})"
       print(node.body, level + 1)
     
     when NestParser::FunctionCall
