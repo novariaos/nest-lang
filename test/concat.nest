@@ -1,0 +1,4 @@
+proc main() {
+    var s = concat("hello ", "world");
+    println(s);
+}

@@ -53,22 +53,32 @@ proc printn(int: n) {
     }
 }
 
-/*
+proc strlen(string: s) {
+    var i = 0;
+    while (read_byte(s + i) != 0) {
+        i = i + 1;
+    }
+    return i;
+}
 
-// TODO: built-in functions: malloc(); free(); strlen(); read_byte(); write_byte();
-proc concat(string: src1, string: src2) {
-    var len1 = strlen(src1);
-    var len2 = strlen(src2);
-    var total = len1 + len2;
+proc memcpy(int: dest, int: src, int: count) {
+    var i = 0;
+    while (i < count) {
+        write_byte(dest + i, read_byte(src + i));
+        i = i + 1;
+    }
+}
 
-    var result = malloc(total);
+proc concat(string: a, string: b) {
+    var len_a = strlen(a);
+    var len_b = strlen(b);
+    var total = len_a + len_b;
+    var result = sbrk(total + 4);
 
-    memcpy(result, src1, len1);
-    memcpy(result + len1, src2, len2);
-    
-    write_byte(result + total - 1, 0);
+    memcpy(result, a, len_a);
+    memcpy(result + len_a, b, len_b);
+
+    write_byte(result + total, 0);
     
     return result;
 }
-
-*/

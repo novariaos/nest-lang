@@ -1,0 +1,6 @@
+proc main() {
+    var s = "foo";
+
+    printn(strlen(s));
+    println("");
+}

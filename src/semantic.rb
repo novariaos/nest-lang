@@ -10,7 +10,7 @@ class NestSemanticAnalyzer
   }.freeze
 
   BINARY_OP_TYPES = {
-    '+' => { int_int: :int, string_string: :string },
+      '+' => { int_int: :int, string_string: :string, string_int: :int, int_string: :int },
     '-' => { int_int: :int },
     '*' => { int_int: :int },
     '/' => { int_int: :int },
@@ -46,6 +46,8 @@ class NestSemanticAnalyzer
       'len'    => { parameters: [{ name: 'value', type: :string }], returns: :int },
       'str'    => { parameters: [{ name: 'value', type: :int }], returns: :string },
       'int'    => { parameters: [{ name: 'value', type: :string }], returns: :int },
+      'read_byte'  => { parameters: [{ name: 'offset', type: :int }], returns: :int },
+      'write_byte' => { parameters: [{ name: 'offset', type: :int }, { name: 'value', type: :int }], returns: :void },
     }
   end
 
@@ -191,6 +193,7 @@ class NestSemanticAnalyzer
     return true if expected == actual
     return true if expected == :int && actual == :bool
     return true if expected == :string && actual == :int
+    return true if expected == :int && actual == :string
 
     Reporter.error(
       "type mismatch: expected #{TYPES[expected] || expected}, got #{TYPES[actual] || actual}",

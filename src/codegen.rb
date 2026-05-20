@@ -372,6 +372,10 @@ class NestCodeGen
     else
       @output_lines << "    PUSH 0"
     end
+    params_count = @current_function ? (@function_locals[@current_function][:params] || 0) : 0
+    if params_count > 0
+      @output_lines << "    STORE_ARG 0"
+    end
     @output_lines << "    LEAVE"
     @output_lines << "    RET"
     @output_lines << ""
@@ -419,6 +423,25 @@ class NestCodeGen
       
       visit_expression(node.arguments[0])
       @output_lines << "    SYSCALL sbrk"
+  
+    when "read_byte"
+      if node.arguments.size != 1
+        raise "read_byte expects 1 argument: offset"
+      end
+      visit_expression(node.arguments[0])
+      @output_lines << "    LOAD_HEAP"
+      @output_lines << "    PUSH 255"
+      @output_lines << "    AND"
+  
+    when "write_byte"
+      if node.arguments.size != 2
+        raise "write_byte expects 2 arguments: offset, value"
+      end
+      visit_expression(node.arguments[0])
+      visit_expression(node.arguments[1])
+      @output_lines << "    PUSH 255"
+      @output_lines << "    AND"
+      @output_lines << "    STORE_HEAP"
   
     when "spawn"
       node.arguments.reverse_each do |arg|
@@ -565,7 +588,7 @@ class NestCodeGen
       end
     end
     
-    left_is_string || right_is_string
+    left_is_string && right_is_string
   end
 
   def visit_numeric_binary(node)

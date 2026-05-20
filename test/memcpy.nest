@@ -1,0 +1,6 @@
+proc main() {
+    var i = "Hey\n";
+    memcpy(result, i, 4);
+
+    print(result);
+}
