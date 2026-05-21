@@ -5,10 +5,35 @@ require_relative "semantic"
 require_relative "codegen"
 require_relative "preprocessor"
 
-path = ARGV[0]
-out = ARGV[1]
+keep_asm = false
+out = "out"
+path = nil
 
-if ARGV[0] == nil
+i = 0
+while i < ARGV.length
+    case ARGV[i]
+    when "-S"
+        keep_asm = true
+    when "-o"
+        i += 1
+        if ARGV[i] == nil
+            print "nest: ".bold
+            print "fatal error: ".red
+            puts "argument missing for '-o'"
+            exit(1)
+        end
+        out = ARGV[i]
+    else
+        if path.nil?
+            path = ARGV[i]
+        elsif ARGV[i] !~ /^-/
+            out = ARGV[i]
+        end
+    end
+    i += 1
+end
+
+if path == nil
     print "nest: ".bold 
     print "fatal error: ".red
     puts "no input files"
@@ -22,10 +47,6 @@ rescue Errno::ENOENT
     print "fatal error: ".red
     puts "file '#{path}' not found"
     exit(1)
-end
-
-if ARGV[1] == nil
-    out = "out"
 end
 
 # Run preprocessor
@@ -70,4 +91,8 @@ codegen = NestCodeGen.new(ast, "#{out}.asm")
 codegen.generate
 
 puts "→ nvma #{out}.asm #{out}.bin".blue.bold
-system("nvma #{out}.asm #{out}.bin")
+if system("nvma #{out}.asm #{out}.bin")
+    File.delete("#{out}.asm") unless keep_asm
+else
+    exit(1)
+end
